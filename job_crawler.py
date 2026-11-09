@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
@@ -28,7 +29,15 @@ TARGET_CONFIGS = [
 ]
 
 def init_google_sheet():
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+    # 優先從環境變數讀取 GCP 憑證字串
+    creds_json_str = os.environ.get('GCP_CREDENTIALS_JSON')
+    if creds_json_str:
+        info = json.loads(creds_json_str)
+        creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+    else:
+        # 本地測試時從檔案讀取
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+
     gc = gspread.authorize(creds)
     sh = gc.open(SPREADSHEET_NAME)
     worksheet = sh.worksheet(SHEET_TAB_NAME)
