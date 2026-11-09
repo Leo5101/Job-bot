@@ -31,12 +31,9 @@ jobs:
           pip install playwright gspread google-auth
           playwright install --with-deps chromium
 
-      # 步驟 4：從 GitHub Secret 還原 credentials.json 憑證檔案
-      - name: Create credentials.json from Secrets
-        run: |
-          echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > credentials.json
-
-      # 步驟 5：執行 Python 爬蟲腳本
+      # 步驟 4 執行 Python 爬蟲腳本，並直接注入 GCP Secret 環境變數
       - name: Run job crawler script
+        env:
+          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
         run: |
           python job_crawler.py
