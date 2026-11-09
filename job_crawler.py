@@ -164,24 +164,24 @@ def extract_certs(text):
     return ", ".join(found_certs) if found_certs else "-"
 
 def extract_jd_requirements_snippet(text):
-    """提取 JD 內的 Requirements / Responsibilities 核心段落，供放入 M 欄給 AI 對話框分析"""
+    """提取 JD 內的職責與要求核心段落，自動跳過開頭冗長的公司介紹"""
     if not text or not isinstance(text, str):
         return ""
-    # 清理多餘空白與換行
     clean_text = re.sub(r'\n{3,}', '\n\n', text.strip())
     
-    # 嘗試定位 Requirements / Qualifications / Responsibilities 開始的位置
+    # 擴充常見的職責與要求標題字眼
     match = re.search(
-        r'(?:Requirements|Qualifications|What you\'ll need|Responsibilities|Key Responsibilities|Job Duties)\s*[:\n]',
+        r'(?:Requirements|Qualifications|What you\'ll need|What we look for|What you will do|Responsibilities|Key Responsibilities|Job Duties|The Role|About the Role|You should have|Skills & Experience)',
         clean_text, re.IGNORECASE
     )
     if match:
-        start_idx = max(0, match.start() - 100)
-        snippet = clean_text[start_idx:start_idx + 1800]
-    else:
-        snippet = clean_text[:1800]
-        
-    return snippet
+        start_idx = max(0, match.start() - 50)
+        return clean_text[start_idx:start_idx + 2500]
+    
+    # 如果完全沒有標準標題，通常開頭 30% 是公司介紹，直接取中後段最核心的 2500 字
+    if len(clean_text) > 2500:
+        return clean_text[-2500:]
+    return clean_text
 
 def fetch_all_jobs(existing_links):
     scraped_rows = []
