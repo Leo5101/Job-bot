@@ -25,11 +25,10 @@ jobs:
           python-version: '3.11'
 
       # 步驟 3：安裝爬蟲與 Google Sheets 相關套件，並安裝 Playwright 瀏覽器核心
-      - name: Install Python packages & Playwright browser
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install playwright gspread google-auth
-          playwright install --with-deps chromium
+          pip install python-jobspy gspread google-auth pandas
 
       # 步驟 4 執行 Python 爬蟲腳本，並直接注入 GCP Secret 環境變數
       - name: Run job crawler script
