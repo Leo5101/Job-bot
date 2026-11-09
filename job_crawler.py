@@ -15,12 +15,33 @@ CREDENTIALS_FILE = 'credentials.json'
 SPREADSHEET_NAME = '香港網絡與傳輸工程師職位追蹤表 (Job Tracking Master)'
 SHEET_TAB_NAME = 'Daily Job Logs'
 
+# 使用雙引號精準鎖定職位詞組，減少不相關職位
 SEARCH_CONFIGS = [
-    {"category": "Network", "term": "Network Engineer"},
-    {"category": "Transmission", "term": "Transmission Engineer OR Submarine Cable OR DWDM"}
+    {
+        "category": "Network",
+        "term": '"Network Engineer" OR "Network Specialist" OR "Network Administrator" OR "Network Infrastructure"'
+    },
+    {
+        "category": "Transmission",
+        "term": '"Transmission Engineer" OR "Submarine Cable" OR "DWDM" OR "Optical Network" OR "Telecommunications Engineer"'
+    }
 ]
 
-# 針對 Network 及 Transmission 領域的核心技能字典 (支援自動大小寫正規化輸出)
+# 第一關：職位名稱必須包含以下至少一個字眼
+VALID_TITLE_KEYWORDS = [
+    'network', 'networking', 'transmission', 'submarine', 'subsea', 'optical', 'fiber', 'fibre',
+    'dwdm', 'otn', 'slte', 'telecom', 'telecommunication', 'infrastructure', 'cisco', 'firewall',
+    'noc', 'wan', 'lan', 'routing', 'voice', 'datacenter', 'data centre'
+]
+
+# 第一關排除：直接踢走軟件開發、機電、銷售等非網絡基建職位
+EXCLUDE_TITLE_KEYWORDS = [
+    'software', 'frontend', 'front-end', 'backend', 'back-end', 'full stack', 'fullstack',
+    'mobile', 'ios', 'android', 'java', 'react', '.net', 'civil', 'mechanical', 'building services',
+    'hvac', 'plumbing', 'sales', 'account manager', 'marketing', 'hr ', 'human resources', 'recruiter'
+]
+
+# 第二關：核心技術字典 (JD 內文必須至少命中 1 項，否則視為假 Network Post 直接丟棄)
 SKILL_PATTERNS = {
     # 路由與交換 (Routing & Switching)
     r'\bBGP\b': 'BGP',
@@ -29,8 +50,8 @@ SKILL_PATTERNS = {
     r'\bVLAN\w*\b': 'VLAN',
     r'\bSTP\b|\bSpanning Tree\b': 'STP',
     r'\bL2/L3\b|\bLayer 2\b|\bLayer 3\b': 'L2/L3 Routing & Switching',
-    r'\bVXLAN\b': 'VXLAN',
-    r'\bEVPN\b': 'EVPN',
+    r'\bVXLAN\b|\bEVPN\b': 'VXLAN/EVPN',
+    r'\bTCP/IP\b|\bDHCP\b|\bDNS\b': 'TCP/IP & Core Services',
     # 網路設備與防火牆廠商 (Vendors & Security)
     r'\bCisco\b|\bCatalyst\b|\bNexus\b': 'Cisco (Catalyst/Nexus)',
     r'\bFortiGate\b|\bFortinet\b': 'Fortinet/FortiGate',
@@ -41,28 +62,28 @@ SKILL_PATTERNS = {
     r'\bJuniper\b|\bJunos\b': 'Juniper',
     r'\bAruba\b': 'Aruba',
     r'\bF5\b': 'F5 Load Balancer',
-    # 廣域網與架構 (WAN, Cloud & Architecture)
+    # 廣域網與架構 (WAN, Cloud & Operations)
     r'\bSD-WAN\b|\bSDWAN\b': 'SD-WAN',
-    r'\bIPsec\b|\bVPN\b': 'IPsec/VPN',
-    r'\bWi-Fi\b|\bWireless\b|\bWLAN\b': 'Enterprise Wi-Fi/WLAN',
+    r'\bIPsec\b|\bVPN\b|\bGRE\b': 'IPsec/VPN Tunnel',
+    r'\bWi-Fi\b|\bWireless\b|\bWLAN\b|\bWLC\b': 'Enterprise Wi-Fi/WLAN',
     r'\bData\s*Cent(?:er|re)\b': 'Data Centre Networking',
     r'\bCutover\b|\bMigration\b': 'Network Migration/Cutover',
-    r'\bFirewall\b': 'Firewall Management',
-    r'\bSolarWinds\b|\bPRTG\b|\bZabbix\b|\bNagios\b': 'Network Monitoring (NMS)',
-    r'\bPython\b|\bAnsible\b|\bAutomation\b': 'Network Automation (Python/Ansible)',
+    r'\bFirewall\b': 'Firewall Implementation',
+    r'\bSolarWinds\b|\bPRTG\b|\bZabbix\b|\bSNMP\b|\bNetFlow\b': 'Network Monitoring (SNMP/NMS)',
+    r'\bPython\b|\bAnsible\b|\bNetmiko\b': 'Network Automation (Python/Ansible)',
+    r'\bNOC\b|\bIncident\b|\bTroubleshooting\b': 'Network Troubleshooting/NOC',
     # 海底光纜與傳輸技術 (Transmission & Submarine Cable)
     r'\bDWDM\b': 'DWDM',
     r'\bOTN\b': 'OTN',
-    r'\bSLTE\b': 'SLTE',
+    r'\bSLTE\b|\bPFE\b': 'Submarine SLTE/PFE',
     r'\bSubmarine\s*Cable\b|\bSubsea\b': 'Submarine Cable Systems',
     r'\bSDH\b|\bSONET\b': 'SDH/SONET',
     r'\bOptical\b|\bFiber\b|\bFibre\b': 'Optical Fiber Transmission',
     r'\bCiena\b|\bInfinera\b|\bNokia\b|\bAlcatel\b': 'Optical Vendor (Ciena/Nokia/Infinera)',
     r'\bROADM\b': 'ROADM',
-    r'\bOTDR\b|\bOSA\b|\bBER\b': 'Optical Testing (OTDR/BER)'
+    r'\bOTDR\b|\bOSA\b|\bBER\b|\bRFC\s*2544\b': 'Optical/Circuit Testing (OTDR/BER)'
 }
 
-# 專業證書提取規則
 CERT_PATTERNS = {
     r'\bCCNA\b': 'CCNA',
     r'\bCCNP\b': 'CCNP',
@@ -90,12 +111,16 @@ def init_google_sheet():
     sh = gc.open(SPREADSHEET_NAME)
     return sh.worksheet(SHEET_TAB_NAME)
 
+def is_title_valid(title):
+    t_lower = title.lower()
+    if any(bad in t_lower for bad in EXCLUDE_TITLE_KEYWORDS):
+        return False
+    return any(good in t_lower for good in VALID_TITLE_KEYWORDS)
+
 def extract_experience(text):
-    """從 JD 內文提取年資要求，格式化為 'X - Y 年' 或 'X+ 年'"""
     if not text or not isinstance(text, str):
         return "未列明"
     
-    # 1. 匹配範圍格式：例如 "3 - 5 years", "3 to 5 yrs", "4-6 years of experience"
     range_match = re.search(
         r'(\d{1,2})\s*(?:-|to|–|~)\s*(\d{1,2})\+?\s*(?:years?|yrs?)',
         text, re.IGNORECASE
@@ -105,7 +130,6 @@ def extract_experience(text):
         if 0 < low < high <= 20:
             return f"{low} - {high} 年"
 
-    # 2. 匹配單一年資要求：例如 "minimum 3 years", "at least 5 years", "3+ years"
     single_patterns = [
         r'(?:minimum|min\.?|at least|over|above|more than)\s+(?:of\s+)?(\d{1,2})\+?\s*(?:years?|yrs?)',
         r'(\d{1,2})\+\s*(?:years?|yrs?)',
@@ -121,20 +145,15 @@ def extract_experience(text):
     return "未列明"
 
 def extract_skills(text, title=""):
-    """從標題與 JD 內文提取關鍵技術詞彙"""
     combined = f"{title} {text}" if isinstance(text, str) else str(title)
     found_skills = []
     for pattern, label in SKILL_PATTERNS.items():
         if re.search(pattern, combined, re.IGNORECASE):
             if label not in found_skills:
                 found_skills.append(label)
-    
-    if found_skills:
-        return ", ".join(found_skills[:6])  # 取最核心的前 6 個技能，保持表格整潔
-    return "General Network Support"
+    return found_skills
 
 def extract_certs(text):
-    """從 JD 內文提取證書要求"""
     if not text or not isinstance(text, str):
         return "-"
     found_certs = []
@@ -144,7 +163,27 @@ def extract_certs(text):
                 found_certs.append(label)
     return ", ".join(found_certs) if found_certs else "-"
 
-def fetch_all_jobs():
+def extract_jd_requirements_snippet(text):
+    """提取 JD 內的 Requirements / Responsibilities 核心段落，供放入 M 欄給 AI 對話框分析"""
+    if not text or not isinstance(text, str):
+        return ""
+    # 清理多餘空白與換行
+    clean_text = re.sub(r'\n{3,}', '\n\n', text.strip())
+    
+    # 嘗試定位 Requirements / Qualifications / Responsibilities 開始的位置
+    match = re.search(
+        r'(?:Requirements|Qualifications|What you\'ll need|Responsibilities|Key Responsibilities|Job Duties)\s*[:\n]',
+        clean_text, re.IGNORECASE
+    )
+    if match:
+        start_idx = max(0, match.start() - 100)
+        snippet = clean_text[start_idx:start_idx + 1800]
+    else:
+        snippet = clean_text[:1800]
+        
+    return snippet
+
+def fetch_all_jobs(existing_links):
     scraped_rows = []
     today_str = datetime.now().strftime("%Y-%m-%d")
 
@@ -154,17 +193,16 @@ def fetch_all_jobs():
         print(f"[*] 正在搜尋 {cat} 職位: {term}")
 
         try:
-            # 開啟 linkedin_fetch_description=True 以獲取 LinkedIn 職位完整內文
             jobs_df = scrape_jobs(
                 site_name=["indeed", "linkedin"],
                 search_term=term,
                 location="Hong Kong",
-                results_wanted=20,
+                results_wanted=25,
                 hours_old=72,
                 country_indeed='Hong Kong',
                 linkedin_fetch_description=True
             )
-            print(f" -> 成功獲取 {len(jobs_df)} 筆職位")
+            print(f" -> 初步獲取 {len(jobs_df)} 筆職位，開始進行雙重過濾...")
 
             for _, job in jobs_df.iterrows():
                 title = str(job.get("title", "")).strip()
@@ -172,19 +210,31 @@ def fetch_all_jobs():
                 loc = str(job.get("location", "HK")).strip()
                 company_field = f"{company} ({loc})" if loc and loc != "nan" else company
 
-                min_sal = str(int(job["min_amount"])) if pd.notna(job.get("min_amount")) else ""
-                max_sal = str(int(job["max_amount"])) if pd.notna(job.get("max_amount")) else ""
                 job_url = str(job.get("job_url", "")).strip()
-                site = str(job.get("site", "JobBoard")).capitalize()
-                description = str(job.get("description", "")) if pd.notna(job.get("description")) else ""
-
-                if not job_url or job_url == "nan":
+                if not job_url or job_url == "nan" or job_url in existing_links:
                     continue
 
-                # 解析年資、技能與證書
+                # 第一關：檢查標題是否為真正的 Network / Transmission 職位
+                if not is_title_valid(title):
+                    print(f"    [跳過 - 標題不符] {title}")
+                    continue
+
+                description = str(job.get("description", "")) if pd.notna(job.get("description")) else ""
+                
+                # 第二關：提取技能並驗證內文是否真的包含 Network/Transmission 技術要求
+                matched_skills = extract_skills(description, title)
+                if not matched_skills:
+                    print(f"    [跳過 - 內文無具體網絡/傳輸技術字眼] {title} | {company}")
+                    continue
+
+                key_skills_str = ", ".join(matched_skills[:6])
                 exp_req = extract_experience(description)
-                key_skills = extract_skills(description, title)
                 certs_req = extract_certs(description)
+                raw_jd_snippet = extract_jd_requirements_snippet(description)
+
+                min_sal = str(int(job["min_amount"])) if pd.notna(job.get("min_amount")) else ""
+                max_sal = str(int(job["max_amount"])) if pd.notna(job.get("max_amount")) else ""
+                site = str(job.get("site", "JobBoard")).capitalize()
 
                 scraped_rows.append([
                     today_str,
@@ -194,46 +244,38 @@ def fetch_all_jobs():
                     min_sal,
                     max_sal,
                     exp_req,
-                    key_skills,
+                    key_skills_str,
                     certs_req,
                     site,
                     job_url,
-                    "Open"
+                    "Open",
+                    raw_jd_snippet  # 第 13 欄 (M 欄)：儲存 JD 原文精華供 Chat Room 分析
                 ])
-                print(f"    [OK] {site}: {title} | 年資: {exp_req} | 技能: {key_skills}")
+                existing_links.add(job_url)
+                print(f"    [OK 入選] {site}: {title} | 年資: {exp_req} | 技能: {key_skills_str}")
+
         except Exception as e:
             print(f"[!] 搜尋 {cat} 時發生錯誤: {e}")
 
     return scraped_rows
 
-def sync_to_sheet(sheet, new_rows):
-    if not new_rows:
-        print("[i] 抓取結果為 0 筆，未寫入試算表。")
-        return
+def main():
+    print("[*] 啟動雙重過濾職位爬蟲任務...")
+    worksheet = init_google_sheet()
 
     try:
-        existing_links = set(sheet.col_values(11)[1:])
+        existing_links = set(worksheet.col_values(11)[1:])
     except Exception:
         existing_links = set()
 
-    to_insert = []
-    for row in new_rows:
-        link = row[10]
-        if link not in existing_links:
-            to_insert.append(row)
-            existing_links.add(link)
+    new_rows = fetch_all_jobs(existing_links)
+    print(f"[*] 任務抓取完畢，共篩選出 {len(new_rows)} 個高純度職位。")
 
-    print(f"[*] 準備寫入 {len(to_insert)} 筆全新資料...")
-    if to_insert:
-        sheet.append_rows(to_insert, value_input_option="USER_ENTERED")
-        print(f"[+] 成功寫入 {len(to_insert)} 個全新真實職位！")
+    if new_rows:
+        worksheet.append_rows(new_rows, value_input_option="USER_ENTERED")
+        print(f"[+] 成功寫入 {len(new_rows)} 個職位（含 M 欄 Raw JD 摘要）！")
     else:
-        print("[i] 所有抓取職位均已存在於試算表中（無新職位）。")
+        print("[i] 本次未發現符合條件的全新職位。")
 
 if __name__ == "__main__":
-    print("[*] 啟動多平台職位深度解析任務...")
-    worksheet = init_google_sheet()
-    jobs = fetch_all_jobs()
-    print(f"[*] 任務抓取完畢，共解析出 {len(jobs)} 個職位。")
-    sync_to_sheet(worksheet, jobs)
-    print("[*] 全部完成！")
+    main()
