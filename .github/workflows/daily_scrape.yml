@@ -3,7 +3,7 @@ name: Daily Job Scraper
 on:
   schedule:
     # 改為 UTC 00:37（即香港時間 08:37 AM），避開 00 與 30 的全球尖峰排隊
-    - cron: '37 0 * * *'
+    - cron: '12 2 * * *'
   workflow_dispatch:
 
 jobs:
